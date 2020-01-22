@@ -122,6 +122,7 @@ impl Chip8 {
             0x7 => self.add(x, nn),
             0x8 => self.opcode8(n, x, y),
             0x9 => self.sne(self.v[x], self.v[y]),
+            0xA => self.ldi(nnn),
             _ => {}
         }
     }
@@ -194,6 +195,11 @@ impl Chip8 {
             0xE => {}
             _ => {}
         }
+    }
+
+    fn ldi(&mut self, constant: u16) {
+        self.i_reg = constant;
+        self.pc.next_instruction();
     }
 }
 
