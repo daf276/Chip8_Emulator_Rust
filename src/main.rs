@@ -1,21 +1,3 @@
-struct Stackpointer {
-    bytes: u8,
-}
-
-impl Stackpointer {
-    pub fn get(&self) -> usize {
-        self.bytes as usize
-    }
-
-    pub fn increase(&mut self) {
-        self.bytes += 1;
-    }
-
-    pub fn decrease(&mut self) {
-        self.bytes -= 1;
-    }
-}
-
 struct Opcode {
     bytes: u16,
 }
@@ -47,6 +29,10 @@ impl Opcode {
 
     pub fn get_second_byte(&self) -> usize {
         ((self.bytes & 0x00F0) >> 4) as usize
+    }
+
+    pub fn get_first_byte(&self) -> usize {
+        (self.bytes & 0x000F) as usize
     }
 }
 
@@ -82,7 +68,7 @@ struct Chip8 {
 
     opcode: Opcode,
     pc: Programcounter,
-    sp: Stackpointer,
+    sp: u8,
 
     i_reg: u16,
     /*
@@ -97,10 +83,10 @@ impl Chip8 {
         let stack: Vec<u16> = vec![0; 16]; //16 Stacklevels
 
         let opcode = Opcode { bytes: 0 };
-        let sp = Stackpointer { bytes: 0 };
+        let sp = 0;
         let pc = Programcounter { bytes: 0x200 };
 
-        let i_reg: u16 = 0;
+        let i_reg = 0;
 
         Chip8 {
             memory,
@@ -119,20 +105,23 @@ impl Chip8 {
             self.memory[self.pc.as_index() + 1],
         );
 
-        let xnnn = self.opcode.get_3bytes();
-        let xxnn = self.opcode.get_2bytes();
-        let xnxx = self.opcode.get_third_byte();
-        let xxnx = self.opcode.get_second_byte();
+        let nnn = self.opcode.get_3bytes();
+        let nn = self.opcode.get_2bytes();
+        let n = self.opcode.get_first_byte();
+        let y = self.opcode.get_second_byte();
+        let x = self.opcode.get_third_byte();
 
         match self.opcode.get_instruction() {
-            0x0 => self.opcode0(xxnn),
-            0x1 => self.jump(xnnn),
-            0x2 => self.call(xnnn),
-            0x3 => self.se(self.v[xnxx], xxnn),
-            0x4 => self.sne(self.v[xnxx], xxnn),
-            0x5 => self.se(self.v[xnxx], self.v[xxnx]),
-            0x6 => self.ld(xnxx, xxnn),
-            0x7 => self.add(xnxx, xxnn),
+            0x0 => self.opcode0(nn),
+            0x1 => self.jump(nnn),
+            0x2 => self.call(nnn),
+            0x3 => self.se(self.v[x], nn),
+            0x4 => self.sne(self.v[x], nn),
+            0x5 => self.se(self.v[x], self.v[y]),
+            0x6 => self.ld(x, nn),
+            0x7 => self.add(x, nn),
+            0x8 => self.opcode8(n, x, y),
+            0x9 => self.sne(self.v[x], self.v[y]),
             _ => {}
         }
     }
@@ -147,8 +136,8 @@ impl Chip8 {
             }
         } else*/
         if subcode == 0xEE {
-            self.sp.decrease();
-            self.pc.set(self.stack[self.sp.get()]);
+            self.sp -= 1;
+            self.pc.set(self.stack[self.sp as usize]);
         }
         self.pc.next_instruction();
     }
@@ -158,21 +147,21 @@ impl Chip8 {
     }
 
     fn call(&mut self, location: u16) {
-        self.stack[self.sp.get()] = self.pc.get();
-        self.sp.increase();
+        self.stack[self.sp as usize] = self.pc.get();
+        self.sp += 1;
         self.pc.set(location);
     }
 
-    fn se(&mut self, a: u8, b: u8) {
-        if a == b {
+    fn se(&mut self, x: u8, y: u8) {
+        if x == y {
             self.pc.afternext_instruction();
         } else {
             self.pc.next_instruction();
         }
     }
 
-    fn sne(&mut self, a: u8, b: u8) {
-        if a != b {
+    fn sne(&mut self, x: u8, y: u8) {
+        if x != y {
             self.pc.afternext_instruction();
         } else {
             self.pc.next_instruction();
@@ -187,6 +176,24 @@ impl Chip8 {
     fn add(&mut self, register_number: usize, constant: u8) {
         self.v[register_number] += constant;
         self.pc.next_instruction();
+    }
+
+    fn opcode8(&mut self, subcode: usize, x: usize, y: usize) {
+        match subcode {
+            0x0 => self.v[x] = self.v[y],
+            0x1 => self.v[x] |= self.v[y],
+            0x2 => self.v[x] &= self.v[y],
+            0x3 => self.v[x] ^= self.v[y],
+            0x4 => {}
+            0x5 => {}
+            0x6 => {
+                self.v[15] = self.v[x] & 0b1;
+                self.v[x] /= 2
+            }
+            0x7 => {}
+            0xE => {}
+            _ => {}
+        }
     }
 }
 
