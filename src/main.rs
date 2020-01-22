@@ -33,8 +33,20 @@ impl Opcode {
         ((self.bytes & 0xF000) >> 12) as usize
     }
 
-    pub fn get_data(&self) -> u16 {
+    pub fn get_3bytes(&self) -> u16 {
         self.bytes & 0x0FFF
+    }
+
+    pub fn get_2bytes(&self) -> u8 {
+        (self.bytes & 0x00FF) as u8
+    }
+
+    pub fn get_third_byte(&self) -> usize {
+        ((self.bytes & 0x0F00) >> 8) as usize
+    }
+
+    pub fn get_second_byte(&self) -> usize {
+        ((self.bytes & 0x00F0) >> 4) as usize
     }
 }
 
@@ -57,6 +69,9 @@ impl Programcounter {
 
     pub fn next_instruction(&mut self) {
         self.bytes += 2;
+    }
+    pub fn afternext_instruction(&mut self) {
+        self.bytes += 4;
     }
 }
 
@@ -83,9 +98,9 @@ impl Chip8 {
 
         let opcode = Opcode { bytes: 0 };
         let sp = Stackpointer { bytes: 0 };
+        let pc = Programcounter { bytes: 0x200 };
 
         let i_reg: u16 = 0;
-        let pc = Programcounter { bytes: 0x200 };
 
         Chip8 {
             memory,
@@ -104,15 +119,22 @@ impl Chip8 {
             self.memory[self.pc.as_index() + 1],
         );
 
+        let xnnn = self.opcode.get_3bytes();
+        let xxnn = self.opcode.get_2bytes();
+        let xnxx = self.opcode.get_third_byte();
+        let xxnx = self.opcode.get_second_byte();
+
         match self.opcode.get_instruction() {
-            0x0 => self.opcode0(),
-            0x1 => self.jump(),
-            0x2 => self.call(),
+            0x0 => self.opcode0(xxnn),
+            0x1 => self.jump(xnnn),
+            0x2 => self.call(xnnn),
+            0x3 => self.se(self.v[xnxx], xxnn),
+            0x5 => self.se(self.v[xnxx], self.v[xxnx]),
             _ => {}
         }
     }
 
-    fn opcode0(&mut self) {
+    fn opcode0(&mut self, subcode: u8) {
         /*
         if (opcode == 0x00E0) { //CLS
             for (auto &i : gfx) {
@@ -121,22 +143,29 @@ impl Chip8 {
                 }
             }
         } else*/
-        if self.opcode.get() == 0x00EE {
-            //RET
+        if subcode == 0xEE {
             self.sp.decrease();
             self.pc.set(self.stack[self.sp.get()]);
         }
         self.pc.next_instruction();
     }
 
-    fn jump(&mut self) {
-        self.pc.set(self.opcode.get_data());
+    fn jump(&mut self, location: u16) {
+        self.pc.set(location);
     }
 
-    fn call(&mut self) {
+    fn call(&mut self, location: u16) {
         self.stack[self.sp.get()] = self.pc.get();
         self.sp.increase();
-        self.pc.set(self.opcode.get_data());
+        self.pc.set(location);
+    }
+
+    fn se(&mut self, a: u8, b: u8) {
+        if a == b {
+            self.pc.afternext_instruction();
+        } else {
+            self.pc.next_instruction();
+        }
     }
 }
 
