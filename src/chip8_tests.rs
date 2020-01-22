@@ -61,6 +61,25 @@ mod tests {
     }
 
     #[test]
+    fn test_register_register_sne() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x48;
+        test_chip.memory[0x201] = 0x54;
+        test_chip.v[8] = 0x54;
+
+        test_chip.emulate_cycle();
+        assert_eq!(test_chip.pc.get(), 0x202);
+
+        let mut test_chip2 = Chip8::new();
+        test_chip2.memory[0x200] = 0x48;
+        test_chip2.memory[0x201] = 0x54;
+        test_chip2.v[8] = 0x64;
+
+        test_chip2.emulate_cycle();
+        assert_eq!(test_chip2.pc.get(), 0x204);
+    }
+
+    #[test]
     fn test_register_register_se() {
         let mut test_chip = Chip8::new();
         test_chip.memory[0x200] = 0x58;

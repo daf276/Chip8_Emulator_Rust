@@ -129,6 +129,7 @@ impl Chip8 {
             0x1 => self.jump(xnnn),
             0x2 => self.call(xnnn),
             0x3 => self.se(self.v[xnxx], xxnn),
+            0x4 => self.sne(self.v[xnxx], xxnn),
             0x5 => self.se(self.v[xnxx], self.v[xxnx]),
             _ => {}
         }
@@ -162,6 +163,14 @@ impl Chip8 {
 
     fn se(&mut self, a: u8, b: u8) {
         if a == b {
+            self.pc.afternext_instruction();
+        } else {
+            self.pc.next_instruction();
+        }
+    }
+
+    fn sne(&mut self, a: u8, b: u8) {
+        if a != b {
             self.pc.afternext_instruction();
         } else {
             self.pc.next_instruction();
