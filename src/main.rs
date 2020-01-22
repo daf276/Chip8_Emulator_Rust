@@ -131,6 +131,8 @@ impl Chip8 {
             0x3 => self.se(self.v[xnxx], xxnn),
             0x4 => self.sne(self.v[xnxx], xxnn),
             0x5 => self.se(self.v[xnxx], self.v[xxnx]),
+            0x6 => self.ld(xnxx, xxnn),
+            0x7 => self.add(xnxx, xxnn),
             _ => {}
         }
     }
@@ -175,6 +177,16 @@ impl Chip8 {
         } else {
             self.pc.next_instruction();
         }
+    }
+
+    fn ld(&mut self, register_number: usize, constant: u8) {
+        self.v[register_number] = constant;
+        self.pc.next_instruction();
+    }
+
+    fn add(&mut self, register_number: usize, constant: u8) {
+        self.v[register_number] += constant;
+        self.pc.next_instruction();
     }
 }
 

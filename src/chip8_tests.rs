@@ -99,4 +99,25 @@ mod tests {
         test_chip2.emulate_cycle();
         assert_eq!(test_chip2.pc.get(), 0x202);
     }
+
+    #[test]
+    fn test_ld() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x61;
+        test_chip.memory[0x201] = 0x05;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 5);
+    }
+
+    #[test]
+    fn test_add() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x71;
+        test_chip.memory[0x201] = 0x05;
+        test_chip.v[1] = 5;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 10);
+    }
 }
