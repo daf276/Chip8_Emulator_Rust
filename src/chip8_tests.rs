@@ -177,4 +177,24 @@ mod tests {
         test_chip2.emulate_cycle();
         assert_eq!(test_chip2.pc.get(), 0x202);
     }
+
+    #[test]
+    fn test_ldi() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0xA5;
+        test_chip.memory[0x201] = 0x53;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.i_reg, 0x553);
+    }
+
+    #[test]
+    fn test_jump_plusv0() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0xB5;
+        test_chip.memory[0x201] = 0x53;
+        test_chip.v[0] = 0x30;
+        test_chip.emulate_cycle();
+        assert_eq!(test_chip.pc.get(), 0x583);
+    }
 }

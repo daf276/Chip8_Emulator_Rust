@@ -123,6 +123,7 @@ impl Chip8 {
             0x8 => self.opcode8(n, x, y),
             0x9 => self.sne(self.v[x], self.v[y]),
             0xA => self.ldi(nnn),
+            0xB => self.jump(nnn + self.v[0] as u16),
             _ => {}
         }
     }
