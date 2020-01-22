@@ -1,3 +1,17 @@
+struct Stackpointer {
+    bytes: u8,
+}
+
+impl Stackpointer {
+    pub fn get(&self) -> usize {
+        self.bytes as usize
+    }
+
+    pub fn increase(&mut self) {
+        self.bytes += 1;
+    }
+}
+
 struct Opcode {
     bytes: u16,
 }
@@ -40,7 +54,7 @@ struct Chip8 {
 
     i_reg: u16,
     pc: u16,
-    sp: u8,
+    sp: Stackpointer,
     /*
     unsigned char delay_timer;
     unsigned char sound_timer;*/
@@ -52,9 +66,9 @@ impl Chip8 {
         let v: Vec<u8> = vec![0; 16]; //CPU registers named V0 to VE, last register is the carry flag
         let stack: Vec<u16> = vec![0; 16]; //16 Stacklevels
 
-        let opcode: Opcode = Opcode { bytes: 0 };
+        let opcode = Opcode { bytes: 0 };
         let i_reg: u16 = 0;
-        let sp: u8 = 0;
+        let sp = Stackpointer { bytes: 0 };
 
         let pc: u16 = 0x200;
 
@@ -81,11 +95,18 @@ impl Chip8 {
         match self.opcode.get_instruction() {
             0x0 => {}
             0x1 => self.jump(),
+            0x2 => self.call(),
             _ => {}
         }
     }
 
     fn jump(&mut self) {
+        self.pc = self.opcode.get_data();
+    }
+
+    fn call(&mut self) {
+        self.stack[self.sp.get()] = self.pc;
+        self.sp.increase();
         self.pc = self.opcode.get_data();
     }
 }
