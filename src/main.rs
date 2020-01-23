@@ -1,4 +1,9 @@
-use rand::prelude::*;
+extern crate clap;
+extern crate rand;
+
+use clap::{App, Arg};
+use std::fs::File;
+use std::io::prelude::*;
 
 struct Opcode {
     bytes: u16,
@@ -104,6 +109,10 @@ impl Chip8 {
             delay_timer,
             sound_timer,
         }
+    }
+
+    pub fn load_into_memory(&mut self, data: Vec<u8>) {
+        self.memory[0x200..data.len() + 0x200].copy_from_slice(&data);
     }
 
     pub fn emulate_cycle(&mut self) {
@@ -255,19 +264,41 @@ impl Chip8 {
 }
 
 fn main() {
-    let mut chip8: Chip8 = Chip8::new();
+    let matches = App::new("Chip-8 Emulator")
+        .version("0.1.0")
+        .arg(
+            Arg::with_name("file")
+                .short("f")
+                .long("file")
+                .takes_value(true)
+                .help("A cool file"),
+        )
+        .get_matches();
 
-    //chip8.memory[0x200] = 1;
-    //chip8.memory[0x201] = 2;
-    //chip8.emulate_cycle();
-    println!("{}", rand::random::<u8>());
-    //println!("{}", chip8.memory[1]);
-    //println!("{}", chip8.memory[4095]);
-    /*let mut quit = false;
+    let myfile = matches.value_of("file");
 
-    while !&quit {
-        chip8.emulate_cycle();
-    }*/
+    match myfile {
+        Some(f) => {
+            println!("The file passed is: {}", f);
+
+            let mut file = File::open(f);
+
+            match file {
+                Ok(x) => init(x),
+                Err(_) => println!("File doesnt exist"),
+            }
+        }
+        None => println!("No File passed"),
+    }
+}
+
+fn init(mut f: File) {
+    let mut chip8 = Chip8::new();
+
+    let mut buffer = Vec::new();
+    f.read_to_end(&mut buffer).unwrap();
+
+    chip8.load_into_memory(buffer)
 }
 
 #[cfg(test)]
