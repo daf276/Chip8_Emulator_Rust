@@ -1,3 +1,5 @@
+use rand::prelude::*;
+
 struct Opcode {
     bytes: u16,
 }
@@ -71,9 +73,9 @@ struct Chip8 {
     sp: u8,
 
     i_reg: u16,
-    /*
-    unsigned char delay_timer;
-    unsigned char sound_timer;*/
+
+    delay_timer: u8,
+    sound_timer: u8,
 }
 
 impl Chip8 {
@@ -88,6 +90,9 @@ impl Chip8 {
 
         let i_reg = 0;
 
+        let delay_timer = 0;
+        let sound_timer = 0;
+
         Chip8 {
             memory,
             v,
@@ -96,6 +101,8 @@ impl Chip8 {
             i_reg,
             pc,
             sp,
+            delay_timer,
+            sound_timer,
         }
     }
 
@@ -124,6 +131,10 @@ impl Chip8 {
             0x9 => self.sne(self.v[x], self.v[y]),
             0xA => self.ldi(nnn),
             0xB => self.jump(nnn + self.v[0] as u16),
+            0xC => self.ld(x, rand::random::<u8>() & nn),
+            0xD => {} //TODO
+            0xE => {} //TODO
+            0xF => self.opcodef(x, y, n),
             _ => {}
         }
     }
@@ -202,14 +213,54 @@ impl Chip8 {
         self.i_reg = constant;
         self.pc.next_instruction();
     }
+
+    fn opcodef(&mut self, x: usize, y: usize, n: usize) {
+        match y {
+            0x0 => {
+                if n == 0x7 {
+                    self.v[x] = self.delay_timer;
+                    self.pc.next_instruction();
+                } else if n == 0xA {
+                    //TODO
+                }
+            }
+            0x1 => {
+                if n == 0x5 {
+                    self.delay_timer = self.v[x];
+                } else if n == 0x8 {
+                    self.sound_timer = self.v[x];
+                } else if n == 0xE {
+                    let (ireg, overflow_bit) = self.i_reg.overflowing_add(self.v[x] as u16);
+                    self.i_reg = ireg;
+                    self.v[15] = overflow_bit as u8;
+                }
+            }
+            0x2 => {}
+            0x3 => {}
+            0x5 => {
+                for i in 0..x {
+                    self.memory[self.i_reg as usize + i] = self.v[i];
+                }
+                self.pc.next_instruction();
+            }
+            0x6 => {
+                for i in 0..x {
+                    self.v[i] = self.memory[self.i_reg as usize + i];
+                }
+                self.pc.next_instruction();
+            }
+            _ => {}
+        }
+    }
 }
 
 fn main() {
     let mut chip8: Chip8 = Chip8::new();
+
     //chip8.memory[0x200] = 1;
     //chip8.memory[0x201] = 2;
     //chip8.emulate_cycle();
-    //println!("{}", chip8.opcode.get());
+    println!("{}", rand::random::<u8>());
     //println!("{}", chip8.memory[1]);
     //println!("{}", chip8.memory[4095]);
     /*let mut quit = false;
