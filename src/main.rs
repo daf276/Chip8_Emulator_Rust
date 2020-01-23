@@ -121,6 +121,7 @@ impl Chip8 {
             self.memory[self.pc.as_index() + 1],
         );
 
+        //TODO this can be done with one function and parameters
         let nnn = self.opcode.get_3bytes();
         let nn = self.opcode.get_2bytes();
         let n = self.opcode.get_first_byte();
@@ -206,16 +207,32 @@ impl Chip8 {
             0x1 => self.v[x] |= self.v[y],
             0x2 => self.v[x] &= self.v[y],
             0x3 => self.v[x] ^= self.v[y],
-            0x4 => {}
-            0x5 => {}
+            0x4 => {
+                let (reg, overflow_bit) = self.v[x].overflowing_add(self.v[y]);
+                self.v[x] = reg;
+                self.v[15] = overflow_bit as u8;
+            }
+            0x5 => {
+                let (reg, overflow_bit) = self.v[x].overflowing_sub(self.v[y]);
+                self.v[x] = reg;
+                self.v[15] = overflow_bit as u8;
+            }
             0x6 => {
                 self.v[15] = self.v[x] & 0b1;
                 self.v[x] /= 2
             }
-            0x7 => {}
-            0xE => {}
+            0x7 => {
+                let (reg, overflow_bit) = self.v[y].overflowing_sub(self.v[x]);
+                self.v[x] = reg;
+                self.v[15] = overflow_bit as u8;
+            }
+            0xE => {
+                self.v[15] = (self.v[x] & 0b10000000) >> 7;
+                self.v[x] = self.v[x].wrapping_shl(1);
+            }
             _ => {}
         }
+        self.pc.next_instruction();
     }
 
     fn ldi(&mut self, constant: u16) {

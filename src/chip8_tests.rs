@@ -158,6 +158,117 @@ mod tests {
     }
 
     #[test]
+    fn test_add_reg_reg() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x81;
+        test_chip.memory[0x201] = 0x24;
+        test_chip.v[1] = 5;
+        test_chip.v[2] = 6;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 11);
+        assert_eq!(test_chip.v[15], 0);
+
+        let mut test_chip2 = Chip8::new();
+        test_chip2.memory[0x200] = 0x81;
+        test_chip2.memory[0x201] = 0x24;
+        test_chip2.v[1] = u8::max_value();
+        test_chip2.v[2] = 6;
+        test_chip2.emulate_cycle();
+
+        assert_eq!(test_chip2.v[1], 5);
+        assert_eq!(test_chip2.v[15], 1);
+    }
+
+    #[test]
+    fn test_sub_reg_reg() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x81;
+        test_chip.memory[0x201] = 0x25;
+        test_chip.v[1] = 7;
+        test_chip.v[2] = 2;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 5);
+        assert_eq!(test_chip.v[15], 0);
+
+        let mut test_chip2 = Chip8::new();
+        test_chip2.memory[0x200] = 0x81;
+        test_chip2.memory[0x201] = 0x25;
+        test_chip2.v[1] = 5;
+        test_chip2.v[2] = 7;
+        test_chip2.emulate_cycle();
+
+        assert_eq!(test_chip2.v[1], 254);
+        assert_eq!(test_chip2.v[15], 1);
+    }
+
+    #[test]
+    fn test_shr() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x81;
+        test_chip.memory[0x201] = 0x26;
+        test_chip.v[1] = 0b0110;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 3);
+        assert_eq!(test_chip.v[15], 0);
+
+        let mut test_chip2 = Chip8::new();
+        test_chip2.memory[0x200] = 0x81;
+        test_chip2.memory[0x201] = 0x26;
+        test_chip2.v[1] = 0b1111;
+        test_chip2.emulate_cycle();
+
+        assert_eq!(test_chip2.v[1], 7);
+        assert_eq!(test_chip2.v[15], 1);
+    }
+
+    #[test]
+    fn test_subn_reg_reg() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x81;
+        test_chip.memory[0x201] = 0x27;
+        test_chip.v[1] = 2;
+        test_chip.v[2] = 7;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 5);
+        assert_eq!(test_chip.v[15], 0);
+
+        let mut test_chip2 = Chip8::new();
+        test_chip2.memory[0x200] = 0x81;
+        test_chip2.memory[0x201] = 0x27;
+        test_chip2.v[1] = 7;
+        test_chip2.v[2] = 5;
+        test_chip2.emulate_cycle();
+
+        assert_eq!(test_chip2.v[1], 254);
+        assert_eq!(test_chip2.v[15], 1);
+    }
+
+    #[test]
+    fn test_shl() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0x81;
+        test_chip.memory[0x201] = 0x2E;
+        test_chip.v[1] = 0b0010;
+        test_chip.emulate_cycle();
+
+        assert_eq!(test_chip.v[1], 4);
+        assert_eq!(test_chip.v[15], 0);
+
+        let mut test_chip2 = Chip8::new();
+        test_chip2.memory[0x200] = 0x81;
+        test_chip2.memory[0x201] = 0x2E;
+        test_chip2.v[1] = 0b10000010;
+        test_chip2.emulate_cycle();
+
+        assert_eq!(test_chip2.v[1], 4);
+        assert_eq!(test_chip2.v[15], 1);
+    }
+
+    #[test]
     fn test_register_register_sne() {
         let mut test_chip = Chip8::new();
         test_chip.memory[0x200] = 0x98;
