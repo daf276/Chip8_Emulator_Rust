@@ -154,7 +154,7 @@ impl Chip8 {
             0xA => self.ldi(nnn),
             0xB => self.jump(nnn + self.v[0] as u16),
             0xC => self.ld(x, rand::random::<u8>() & nn),
-            0xD => {} //self.display_sprite(x as u8, y as u8, n as u8),
+            0xD => self.display_sprite(x as u8, y as u8, n as u8),
             0xE => {} //TODO
             0xF => self.opcodef(x, y, n),
             _ => {}
@@ -225,7 +225,7 @@ impl Chip8 {
             }
             0x6 => {
                 self.v[15] = self.v[x] & 0b1;
-                self.v[x] /= 2
+                self.v[x] /= 2;
             }
             0x7 => {
                 let (reg, overflow_bit) = self.v[y].overflowing_sub(self.v[x]);
@@ -247,10 +247,10 @@ impl Chip8 {
     }
 
     fn display_sprite(&mut self, x: u8, y: u8, n: u8) {
-        let bitmask = [128, 64, 32, 16, 8, 4, 2, 1];
-        let mut x_pos = vec![0, 8];
+        let bitmask = [128u8, 64, 32, 16, 8, 4, 2, 1];
+        let mut x_pos = vec![0; 8];
 
-        let x = self.v[x as usize] as isize;
+        let x = self.v[x as usize] as usize;
         let mut y = self.v[y as usize] as isize;
 
         //Init overflow register as 0
@@ -259,27 +259,28 @@ impl Chip8 {
         //For horizontal display wrap around
         for i in 0..8 {
             if x + i < 64 {
-                x_pos[i as usize] = x + i;
+                x_pos[i] = x + i;
             } else {
-                x_pos[i as usize] = x + i - 64;
+                x_pos[i] = x + i - 64;
             }
         }
 
-        for i in 0..n as isize {
-            let row = self.memory[self.i_reg as usize + i as usize];
-            if y + i >= 32 {
-                y = -i;
+        for i in 0..n as usize {
+            let byte = self.memory[self.i_reg as usize + i];
+
+            if y + i as isize >= 32 {
+                y = -(i as isize);
             } //For vertical display wrap around
 
             for j in 0..8 {
                 if self.v[15] != 1
-                    && (row & bitmask[j]) > 0
-                    && self.gfx[(y + i) as usize][x_pos[j] as usize]
+                    && (byte & bitmask[j]) > 0
+                    && self.gfx[y as usize + i][x_pos[j] as usize]
                 {
                     self.v[15] = 1;
                 }
-                self.gfx[(y + i) as usize][x_pos[j] as usize] =
-                    ((row & bitmask[j]) > 0) ^ self.gfx[(y + i) as usize][x_pos[j] as usize];
+                self.gfx[y as usize + i][x_pos[j] as usize] =
+                    ((byte & bitmask[j]) > 0) ^ self.gfx[y as usize + i][x_pos[j] as usize];
             }
         }
 
