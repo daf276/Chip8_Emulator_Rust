@@ -5,7 +5,6 @@ extern crate sdl2;
 use clap::{App, Arg};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
 use std::fs::File;
 use std::io::prelude::*;
 use std::thread::sleep;
@@ -78,7 +77,7 @@ impl Programcounter {
 }
 
 struct Chip8 {
-    gfx: Vec<Vec<u8>>,
+    gfx: Vec<Vec<bool>>,
     memory: Vec<u8>,
     v: Vec<u8>,
     stack: Vec<u16>,
@@ -95,7 +94,7 @@ struct Chip8 {
 
 impl Chip8 {
     pub fn new() -> Chip8 {
-        let gfx = vec![vec![0; 64]; 32];
+        let gfx = vec![vec![false; 64]; 32];
         let mut memory = vec![0; 4096]; //4096 bits of memory
         let v = vec![0; 16]; //CPU registers named V0 to VE, last register is the carry flag
         let stack = vec![0; 16]; //16 Stacklevels
@@ -165,7 +164,7 @@ impl Chip8 {
 
     fn opcode0(&mut self, subcode: u8) {
         if subcode == 0xE0 {
-            self.gfx = vec![vec![0; 64]; 32];
+            self.gfx = vec![vec![false; 64]; 32];
         } else if subcode == 0xEE {
             self.sp -= 1;
             self.pc.set(self.stack[self.sp as usize]);
@@ -245,6 +244,46 @@ impl Chip8 {
 
     fn ldi(&mut self, constant: u16) {
         self.i_reg = constant;
+        self.pc.next_instruction();
+    }
+
+    fn display_sprite(&mut self, x: u8, y: u8, n: u8) {
+        let bitmask = [128, 64, 32, 16, 8, 4, 2, 1];
+        let mut x_pos = vec![0, 8];
+
+        let x = self.v[x as usize] as isize;
+        let mut y = self.v[y as usize] as isize;
+
+        //Init overflow register as 0
+        self.v[15] = 0;
+
+        //For horizontal display wrap around
+        for i in 0..8 {
+            if x + i < 64 {
+                x_pos[i as usize] = x + i;
+            } else {
+                x_pos[i as usize] = x + i - 64;
+            }
+        }
+
+        for i in 0..n as isize {
+            let row = self.memory[self.i_reg as usize + i as usize];
+            if y + i >= 32 {
+                y = -i;
+            } //For vertical display wrap around
+
+            for j in 0..8 {
+                if self.v[15] != 1
+                    && (row & bitmask[j]) > 0
+                    && self.gfx[(y + i) as usize][x_pos[j] as usize]
+                {
+                    self.v[15] = 1;
+                }
+                self.gfx[(y + i) as usize][x_pos[j] as usize] =
+                    ((row & bitmask[j]) > 0) ^ self.gfx[(y + i) as usize][x_pos[j] as usize];
+            }
+        }
+
         self.pc.next_instruction();
     }
 
