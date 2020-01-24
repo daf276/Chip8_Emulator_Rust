@@ -164,15 +164,9 @@ impl Chip8 {
     }
 
     fn opcode0(&mut self, subcode: u8) {
-        /*
-        if (opcode == 0x00E0) { //CLS
-            for (auto &i : gfx) {
-                for (auto &&j : i) {
-                    j = false;
-                }
-            }
-        } else*/
-        if subcode == 0xEE {
+        if subcode == 0xE0 {
+            self.gfx = vec![vec![0; 64]; 32];
+        } else if subcode == 0xEE {
             self.sp -= 1;
             self.pc.set(self.stack[self.sp as usize]);
         }
@@ -275,8 +269,16 @@ impl Chip8 {
                     self.v[15] = overflow_bit as u8;
                 }
             }
-            0x2 => {}
-            0x3 => {}
+            0x2 => {
+                self.i_reg = self.v[x] as u16 * 5;
+                self.pc.next_instruction();
+            }
+            0x3 => {
+                self.memory[self.i_reg as usize] = self.v[x] / 100;
+                self.memory[self.i_reg as usize + 1] = (self.v[x] / 10) % 10;
+                self.memory[self.i_reg as usize + 2] = (self.v[x] % 100) % 10;
+                self.pc.next_instruction();
+            }
             0x5 => {
                 for i in 0..x {
                     self.memory[self.i_reg as usize + i] = self.v[i];

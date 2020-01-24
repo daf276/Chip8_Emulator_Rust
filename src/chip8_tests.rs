@@ -361,6 +361,28 @@ mod tests {
     }
 
     #[test]
+    fn test_ireg_to_sprite_location() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0xF5;
+        test_chip.memory[0x201] = 0x29;
+        test_chip.v[5] = 5;
+        test_chip.emulate_cycle();
+        assert_eq!(test_chip.i_reg, 25);
+    }
+
+    #[test]
+    fn test_store_bcd_in_memory() {
+        let mut test_chip = Chip8::new();
+        test_chip.memory[0x200] = 0xF5;
+        test_chip.memory[0x201] = 0x33;
+        test_chip.v[5] = 234;
+        test_chip.emulate_cycle();
+        assert_eq!(test_chip.memory[test_chip.i_reg as usize], 2);
+        assert_eq!(test_chip.memory[test_chip.i_reg as usize + 1], 3);
+        assert_eq!(test_chip.memory[test_chip.i_reg as usize + 2], 4);
+    }
+
+    #[test]
     fn test_store_all_regs_to_memory() {
         let mut test_chip = Chip8::new();
         test_chip.memory[0x200] = 0xF3;
