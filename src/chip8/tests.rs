@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
-    use crate::Chip8;
+    use super::super::Chip8;
 
     #[test]
     fn test_jump() {
