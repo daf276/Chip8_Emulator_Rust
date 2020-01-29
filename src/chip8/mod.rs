@@ -26,6 +26,7 @@ impl Programcounter {
 
 pub(crate) struct Chip8 {
     pub gfx: Vec<Vec<bool>>,
+    pub key_pressed: Vec<bool>,
     memory: Vec<u8>,
     v: Vec<u8>,
     stack: Vec<u16>,
@@ -43,6 +44,7 @@ pub(crate) struct Chip8 {
 impl Chip8 {
     pub fn new() -> Chip8 {
         let gfx = vec![vec![false; 64]; 32];
+        let key_pressed = vec![false; 16];
         let mut memory = vec![0; 4096]; //4096 bits of memory
         let v = vec![0; 16]; //CPU registers named V0 to VE, last register is the carry flag
         let stack = vec![0; 16]; //16 Stacklevels
@@ -60,6 +62,7 @@ impl Chip8 {
 
         Chip8 {
             gfx,
+            key_pressed,
             memory,
             v,
             stack,
@@ -79,6 +82,8 @@ impl Chip8 {
     pub fn emulate_cycle(&mut self) {
         self.opcode = (self.memory[self.pc.as_index()] as u16) << 8
             | self.memory[self.pc.as_index() + 1] as u16;
+
+        println!("{:x}", self.opcode);
 
         let instruction = (self.opcode & 0xF000) >> 12;
         let nnn = self.opcode & 0x0FFF;
@@ -102,9 +107,14 @@ impl Chip8 {
             0xB => self.jump(nnn + self.v[0] as u16),
             0xC => self.ld(x, rand::random::<u8>() & nn),
             0xD => self.display_sprite(x as u8, y as u8, n),
-            0xE => {} //TODO
+            0xE => self.opcodee(x, nn),
             0xF => self.opcodef(x, y, n),
             _ => {}
+        }
+
+        // TODO Fully implement timers
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
         }
     }
 
@@ -150,7 +160,7 @@ impl Chip8 {
     }
 
     fn add(&mut self, register_number: usize, constant: u8) {
-        self.v[register_number] += constant;
+        self.v[register_number] = self.v[register_number].wrapping_add(constant);
         self.pc.next_instruction();
     }
 
@@ -223,16 +233,33 @@ impl Chip8 {
             for j in 0..8 {
                 if self.v[15] != 1
                     && (byte & bitmask[j]) > 0
-                    && self.gfx[y as usize + i][x_pos[j] as usize]
+                    && self.gfx[(y as usize).wrapping_add(i)][x_pos[j] as usize]
                 {
                     self.v[15] = 1;
                 }
-                self.gfx[y as usize + i][x_pos[j] as usize] =
-                    ((byte & bitmask[j]) > 0) ^ self.gfx[y as usize + i][x_pos[j] as usize];
+                self.gfx[(y as usize).wrapping_add(i)][x_pos[j] as usize] = ((byte & bitmask[j])
+                    > 0)
+                    ^ self.gfx[(y as usize).wrapping_add(i)][x_pos[j] as usize];
             }
         }
 
         self.pc.next_instruction();
+    }
+
+    fn opcodee(&mut self, x: usize, nn: u8) {
+        if nn == 0x9E {
+            if self.key_pressed[self.v[x] as usize] {
+                self.pc.afternext_instruction();
+            } else {
+                self.pc.next_instruction();
+            }
+        } else if nn == 0xA1 {
+            if !self.key_pressed[self.v[x] as usize] {
+                self.pc.afternext_instruction();
+            } else {
+                self.pc.next_instruction();
+            }
+        }
     }
 
     fn opcodef(&mut self, x: usize, y: usize, n: u8) {
@@ -242,7 +269,13 @@ impl Chip8 {
                     self.v[x] = self.delay_timer;
                     self.pc.next_instruction();
                 } else if n == 0xA {
-                    //TODO
+                    for i in 0..16 {
+                        if self.key_pressed[i] {
+                            self.v[x] = i as u8;
+                            self.pc.next_instruction();
+                            break;
+                        }
+                    }
                 }
             }
             0x1 => {
@@ -255,6 +288,7 @@ impl Chip8 {
                     self.i_reg = ireg;
                     self.v[15] = overflow_bit as u8;
                 }
+                self.pc.next_instruction();
             }
             0x2 => {
                 self.i_reg = self.v[x] as u16 * 5;
