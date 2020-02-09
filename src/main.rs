@@ -8,49 +8,67 @@ use clap::{App, Arg};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::render::{Canvas, Texture};
+use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::EventPump;
-use sdl2::Sdl;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
-use std::thread::sleep;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
 
-const SCREEN_WIDTH: usize = 64;
+const SCREEN_WIDTH: usize = 64; //Todo maybe make these members of the chip8 struct?
 const SCREEN_HEIGHT: usize = 32;
 const PITCH: usize = SCREEN_WIDTH * 4;
-const SCALE: u32 = 16;
 
 fn main() {
     let matches = App::new("Chip-8 Emulator")
-        .version("0.2.0")
+        .version("0.3.0")
         .arg(
             Arg::with_name("file")
                 .short("f")
                 .long("file")
                 .takes_value(true)
-                .help("A cool file"),
+                .help("File to be emulated"),
+        )
+        .arg(
+            Arg::with_name("scale")
+                .short("s")
+                .long("scale")
+                .takes_value(true)
+                .help("1x is 64*32"),
         )
         .get_matches();
 
-    match matches.value_of("file") {
-        Some(f) => {
-            println!("The file passed is: {}", f);
+    let screen_scale: u32 = match matches.value_of("scale") {
+        Some(x) => match x.parse() {
+            Ok(y) => y,
+            Err(_) => 1,
+        },
+        None => 1,
+    };
 
-            match File::open(f) {
-                Ok(file) => emulate(load_program(file)),
-                Err(_) => println!("File doesnt exist"),
-            }
-        }
+    match matches.value_of("file") {
+        Some(f) => match File::open(f) {
+            Ok(file) => emulate(load_program(file), screen_scale),
+            Err(_) => println!("File doesnt exist"),
+        },
         None => println!("No File passed"),
     }
 }
 
-fn emulate(mut chip: chip8::Chip8) {
-    let (mut event_pump, mut canvas) = init_sdl();
-    let texture_creator = canvas.texture_creator();
+fn load_program(mut file: File) -> chip8::Chip8 {
+    let mut chip8 = chip8::Chip8::new();
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).unwrap();
+    chip8.load_into_memory(buffer);
+    return chip8;
+}
+
+fn emulate(mut chip: chip8::Chip8, screen_scale: u32) {
+    let (mut event_pump, mut canvas) = init_sdl(screen_scale);
+    let texture_creator = canvas.texture_creator(); //Todo find a better solution for this
     let mut texture = texture_creator
         .create_texture_static(
             PixelFormatEnum::ABGR8888,
@@ -59,61 +77,85 @@ fn emulate(mut chip: chip8::Chip8) {
         )
         .expect("Can't create texture");
 
+    let mutex = Arc::new(Mutex::new(vec![vec![false; 64]; 32]));
+    let thread_mutex = mutex.clone();
+
+    thread::spawn(move || loop {
+        let before_cycle = Instant::now();
+        //chip.key_pressed = map_keys(&mut event_pump);
+        chip.emulate_cycle();
+
+        *thread_mutex.lock().unwrap() = chip.gfx.clone();
+
+        let time_to_wait = 50000u128.saturating_sub(before_cycle.elapsed().as_nanos());
+        thread::sleep(Duration::new(0, time_to_wait as u32));
+        //println!("{}", time_to_wait);
+    });
+
     let mut quit = false;
 
     while !&quit {
         let before_cycle = Instant::now();
 
         quit = quit_event_activated(&mut event_pump);
+        //chip.key_pressed = map_keys(&mut event_pump);
+        //chip.emulate_cycle();
 
-        let keys: HashSet<Keycode> = event_pump
-            .keyboard_state()
-            .pressed_scancodes()
-            .filter_map(Keycode::from_scancode)
-            .collect();
-
-        chip.key_pressed = map_keys(keys);
-
-        chip.emulate_cycle();
-
-        let pixel_data = update_gfx(&chip.gfx);
+        let pixel_data = update_gfx(&mutex.lock().unwrap().clone());
         texture.update(None, &pixel_data[..], PITCH).unwrap();
 
-        canvas.clear();
         canvas.copy(&texture, None, None).unwrap();
         canvas.present();
 
-        //let time_to_wait = 16666666u128.saturating_sub(before_cycle.elapsed().as_nanos()); //60Fps
-        //sleep(Duration::new(0, time_to_wait as u32));
+        let time_to_wait = 16_666_666_u128.saturating_sub(before_cycle.elapsed().as_nanos()); //60Fps
+                                                                                              //println!("{}", time_to_wait);
+        thread::sleep(Duration::new(0, time_to_wait as u32));
     }
 }
 
-fn init_sdl() -> (EventPump, Canvas<Window>) {
+fn init_sdl(screen_scale: u32) -> (EventPump, Canvas<Window>) {
     let sdl_context = sdl2::init().expect("Can't get SDLContext");
-
     let video_subsystem = sdl_context
         .video()
         .expect("Can't initialize video subsystem");
     let window = video_subsystem
         .window(
             "Chip-8",
-            SCALE * SCREEN_WIDTH as u32,
-            SCALE * SCREEN_HEIGHT as u32,
+            screen_scale * SCREEN_WIDTH as u32,
+            screen_scale * SCREEN_HEIGHT as u32,
         )
         .position_centered()
         .build()
         .expect("Can't create window");
     let mut canvas = window.into_canvas().build().expect("Can't create canvas");
-    canvas.set_scale(SCALE as f32, SCALE as f32).unwrap();
+    canvas
+        .set_scale(screen_scale as f32, screen_scale as f32)
+        .unwrap();
 
-    let mut event_pump = sdl_context.event_pump().expect("Can't get event pump");
+    let event_pump = sdl_context.event_pump().expect("Can't get event pump");
 
-    return (event_pump, canvas);
+    (event_pump, canvas)
 }
 
-fn map_keys(keys: HashSet<Keycode>) -> Vec<bool> {
+fn quit_event_activated(event_pump: &mut EventPump) -> bool {
+    for event in event_pump.poll_iter() {
+        if let Event::Quit { .. } = event {
+            return true;
+        }
+    }
+    false
+}
+
+fn map_keys(event_pump: &mut EventPump) -> Vec<bool> {
+    let keys: HashSet<Keycode> = event_pump
+        .keyboard_state()
+        .pressed_scancodes()
+        .filter_map(Keycode::from_scancode)
+        .collect();
+
     let mut key_pressed = vec![false; 16];
 
+    //Todo find a better solution for this and put the keys in a config file
     for key in keys {
         match key {
             Keycode::Num1 => key_pressed[1] = true,
@@ -136,46 +178,24 @@ fn map_keys(keys: HashSet<Keycode>) -> Vec<bool> {
         }
     }
 
-    return key_pressed;
+    key_pressed
 }
 
-fn quit_event_activated(event_pump: &mut EventPump) -> bool {
-    for event in event_pump.poll_iter() {
-        if let Event::Quit { .. } = event {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-fn load_program(mut file: File) -> chip8::Chip8 {
-    let mut chip8 = chip8::Chip8::new();
-
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).unwrap();
-
-    chip8.load_into_memory(buffer);
-
-    return chip8;
-}
-
-fn update_gfx(emulator_gfx: &Vec<Vec<bool>>) -> Vec<u8> {
+fn update_gfx(emulator_gfx: &[Vec<bool>]) -> Vec<u8> {
     let mut gfx = vec![0; SCREEN_HEIGHT * SCREEN_WIDTH];
 
     for i in 0..SCREEN_HEIGHT {
         for j in 0..SCREEN_WIDTH {
-            let pixel = emulator_gfx[i][j] as u32 * 0xFFFFFFFF;
-            gfx[i * SCREEN_WIDTH + j] = pixel;
+            gfx[i * SCREEN_WIDTH + j] = emulator_gfx[i][j] as u32 * 0xFFFF_FFFF;
         }
     }
 
-    return split_gfx_into_color_components(gfx);
+    split_gfx_into_color_components(gfx)
 }
 
 fn split_gfx_into_color_components(gfx: Vec<u32>) -> Vec<u8> {
     unsafe {
         let (_, ret, _) = gfx.align_to::<u8>();
-        return ret.to_vec();
+        ret.to_vec()
     }
 }

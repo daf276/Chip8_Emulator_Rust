@@ -83,9 +83,7 @@ impl Chip8 {
         self.opcode = (self.memory[self.pc.as_index()] as u16) << 8
             | self.memory[self.pc.as_index() + 1] as u16;
 
-        println!("{:x}", self.opcode);
-
-        let instruction = (self.opcode & 0xF000) >> 12;
+        let instruction = (&self.opcode & 0xF000) >> 12;
         let nnn = self.opcode & 0x0FFF;
         let nn = (self.opcode & 0x00FF) as u8;
         let n = (self.opcode & 0x000F) as u8;
@@ -414,7 +412,7 @@ impl Chip8 {
         memory[78] = 0x80;
         memory[79] = 0x80;
 
-        return memory;
+        memory
     }
 }
 
