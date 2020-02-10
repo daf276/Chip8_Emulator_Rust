@@ -22,7 +22,7 @@ const PITCH: usize = (Chip8::SCREEN_WIDTH * 4) as usize;
 
 fn main() {
     let matches = App::new("Chip-8 Emulator")
-        .version("0.4.0")
+        .version("0.5.0")
         .arg(
             Arg::with_name("file")
                 .short("f")

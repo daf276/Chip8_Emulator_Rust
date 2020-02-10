@@ -31,7 +31,7 @@ impl Chip8 {
         let stack = vec![0; 16]; //16 Stacklevels
         let opcode = 0;
         let sp = 0;
-        let pc = 0x200;
+        let pc = 0x200; //Execution must start here
         let i_reg = 0;
         let delay_timer = 0;
         let sound_timer = 0;
@@ -171,7 +171,7 @@ impl Chip8 {
             }
             0x6 => {
                 self.v[15] = self.v[x] & 0b1;
-                self.v[x] /= 2;
+                self.v[x] >>= 1;
             }
             0x7 => {
                 let (reg, overflow_bit) = self.v[y].overflowing_sub(self.v[x]);
@@ -179,8 +179,8 @@ impl Chip8 {
                 self.v[15] = !overflow_bit as u8;
             }
             0xE => {
-                self.v[15] = (self.v[x] & 0b10000000) >> 7;
-                self.v[x] = self.v[x].wrapping_shl(1);
+                self.v[15] = (self.v[x] & 0b1000_0000) >> 7;
+                self.v[x] <<= 1;
             }
             _ => {}
         }
@@ -251,12 +251,9 @@ impl Chip8 {
                     self.v[x] = self.delay_timer;
                     self.pc += 2;
                 } else if n == 0xA {
-                    for i in 0..16 {
-                        if self.key_pressed[i] {
-                            self.v[x] = i as u8;
-                            self.pc += 2;
-                            break;
-                        }
+                    if let Some(y) = self.key_pressed.iter().find(|&&y| y) {
+                        self.v[x] = *y as u8;
+                        self.pc += 2;
                     }
                 }
             }
@@ -273,6 +270,8 @@ impl Chip8 {
                 self.pc += 2;
             }
             0x2 => {
+                //Set i to location of sprite in vx
+                //This works because sprites are 5bytes long and begin at memory address 0x0
                 self.i_reg = self.v[x] as u16 * 5;
                 self.pc += 2;
             }
