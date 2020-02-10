@@ -1,4 +1,3 @@
-#[cfg(test)]
 mod tests {
     use super::super::Chip8;
 
@@ -8,7 +7,7 @@ mod tests {
         test_chip.memory[0x200] = 0x18;
         test_chip.memory[0x201] = 0x54;
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.pc.get(), 0x0854);
+        assert_eq!(test_chip.pc, 0x0854);
     }
 
     #[test]
@@ -18,7 +17,7 @@ mod tests {
         test_chip.memory[0x201] = 0x54;
         test_chip.emulate_cycle();
 
-        assert_eq!(test_chip.pc.get(), 0x0854);
+        assert_eq!(test_chip.pc, 0x0854);
         assert_eq!(test_chip.stack[0], 0x0200);
         assert_eq!(test_chip.sp, 1);
     }
@@ -34,7 +33,7 @@ mod tests {
         test_chip.emulate_cycle();
         test_chip.emulate_cycle();
 
-        assert_eq!(test_chip.pc.get(), 0x202);
+        assert_eq!(test_chip.pc, 0x202);
         assert_eq!(test_chip.stack[0], 0x0200);
         assert_eq!(test_chip.sp, 0);
     }
@@ -47,7 +46,7 @@ mod tests {
         test_chip.v[8] = 0x54;
 
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.pc.get(), 0x204);
+        assert_eq!(test_chip.pc, 0x204);
 
         let mut test_chip2 = Chip8::new();
         test_chip2.memory[0x200] = 0x38;
@@ -55,7 +54,7 @@ mod tests {
         test_chip2.v[8] = 0x64;
 
         test_chip2.emulate_cycle();
-        assert_eq!(test_chip2.pc.get(), 0x202);
+        assert_eq!(test_chip2.pc, 0x202);
     }
 
     #[test]
@@ -66,7 +65,7 @@ mod tests {
         test_chip.v[8] = 0x54;
 
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.pc.get(), 0x202);
+        assert_eq!(test_chip.pc, 0x202);
 
         let mut test_chip2 = Chip8::new();
         test_chip2.memory[0x200] = 0x48;
@@ -74,7 +73,7 @@ mod tests {
         test_chip2.v[8] = 0x64;
 
         test_chip2.emulate_cycle();
-        assert_eq!(test_chip2.pc.get(), 0x204);
+        assert_eq!(test_chip2.pc, 0x204);
     }
 
     #[test]
@@ -86,7 +85,7 @@ mod tests {
         test_chip.v[5] = 0x54;
 
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.pc.get(), 0x204);
+        assert_eq!(test_chip.pc, 0x204);
 
         let mut test_chip2 = Chip8::new();
         test_chip2.memory[0x200] = 0x58;
@@ -95,7 +94,7 @@ mod tests {
         test_chip2.v[5] = 0x54;
 
         test_chip2.emulate_cycle();
-        assert_eq!(test_chip2.pc.get(), 0x202);
+        assert_eq!(test_chip2.pc, 0x202);
     }
 
     #[test]
@@ -275,7 +274,7 @@ mod tests {
         test_chip.v[5] = 0x64;
 
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.pc.get(), 0x204);
+        assert_eq!(test_chip.pc, 0x204);
 
         let mut test_chip2 = Chip8::new();
         test_chip2.memory[0x200] = 0x98;
@@ -284,7 +283,7 @@ mod tests {
         test_chip2.v[5] = 0x64;
 
         test_chip2.emulate_cycle();
-        assert_eq!(test_chip2.pc.get(), 0x202);
+        assert_eq!(test_chip2.pc, 0x202);
     }
 
     #[test]
@@ -304,7 +303,7 @@ mod tests {
         test_chip.memory[0x201] = 0x53;
         test_chip.v[0] = 0x30;
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.pc.get(), 0x583);
+        assert_eq!(test_chip.pc, 0x583);
     }
 
     #[test]

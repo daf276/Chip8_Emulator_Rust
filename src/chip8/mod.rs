@@ -1,30 +1,6 @@
-struct Programcounter {
-    bytes: u16,
-}
-
-impl Programcounter {
-    //TODO remove struct, this should be fine as a primitive type
-    pub fn get(&self) -> u16 {
-        self.bytes
-    }
-
-    pub fn as_index(&self) -> usize {
-        self.bytes as usize
-    }
-
-    pub fn set(&mut self, pc: u16) {
-        self.bytes = pc
-    }
-
-    pub fn next_instruction(&mut self) {
-        self.bytes += 2;
-    }
-    pub fn afternext_instruction(&mut self) {
-        self.bytes += 4;
-    }
-}
-
-pub(crate) struct Chip8 {
+use std::fs::File;
+use std::io::prelude::*;
+pub struct Chip8 {
     pub gfx: Vec<Vec<bool>>,
     pub key_pressed: Vec<bool>,
     memory: Vec<u8>,
@@ -32,17 +8,22 @@ pub(crate) struct Chip8 {
     stack: Vec<u16>,
 
     opcode: u16,
-    pc: Programcounter,
+    pc: u16,
     sp: u8,
 
     i_reg: u16,
 
     delay_timer: u8,
     sound_timer: u8,
+
+    pub screen_scale: u32,
 }
 
 impl Chip8 {
-    pub fn new() -> Chip8 {
+    pub const SCREEN_WIDTH: u32 = 64;
+    pub const SCREEN_HEIGHT: u32 = 32;
+
+    fn new() -> Chip8 {
         let gfx = vec![vec![false; 64]; 32];
         let key_pressed = vec![false; 16];
         let mut memory = vec![0; 4096]; //4096 bits of memory
@@ -51,12 +32,14 @@ impl Chip8 {
 
         let opcode = 0;
         let sp = 0;
-        let pc = Programcounter { bytes: 0x200 };
+        let pc = 0x200;
 
         let i_reg = 0;
 
         let delay_timer = 0;
         let sound_timer = 0;
+
+        let screen_scale = 1;
 
         memory = Chip8::load_hex_digits(memory);
 
@@ -72,7 +55,22 @@ impl Chip8 {
             sp,
             delay_timer,
             sound_timer,
+            screen_scale,
         }
+    }
+
+    pub fn create_chip(mut file: File, screen_scale: u32) -> Chip8 {
+        let mut chip = Chip8::load_program(file);
+        chip.screen_scale = screen_scale;
+        chip
+    }
+
+    fn load_program(mut file: File) -> Chip8 {
+        let mut chip8 = Chip8::new();
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).unwrap();
+        chip8.load_into_memory(buffer);
+        chip8
     }
 
     pub fn load_into_memory(&mut self, data: Vec<u8>) {
@@ -80,8 +78,8 @@ impl Chip8 {
     }
 
     pub fn emulate_cycle(&mut self) {
-        self.opcode = (self.memory[self.pc.as_index()] as u16) << 8
-            | self.memory[self.pc.as_index() + 1] as u16;
+        self.opcode =
+            (self.memory[self.pc as usize] as u16) << 8 | self.memory[self.pc as usize + 1] as u16;
 
         let instruction = (&self.opcode & 0xF000) >> 12;
         let nnn = self.opcode & 0x0FFF;
@@ -121,45 +119,37 @@ impl Chip8 {
             self.gfx = vec![vec![false; 64]; 32];
         } else if subcode == 0xEE {
             self.sp -= 1;
-            self.pc.set(self.stack[self.sp as usize]);
+            self.pc = self.stack[self.sp as usize];
         }
-        self.pc.next_instruction();
+        self.pc += 2;
     }
 
     fn jump(&mut self, location: u16) {
-        self.pc.set(location);
+        self.pc = location;
     }
 
     fn call(&mut self, location: u16) {
-        self.stack[self.sp as usize] = self.pc.get();
+        self.stack[self.sp as usize] = self.pc;
         self.sp += 1;
-        self.pc.set(location);
+        self.pc = location;
     }
 
     fn se(&mut self, x: u8, y: u8) {
-        if x == y {
-            self.pc.afternext_instruction();
-        } else {
-            self.pc.next_instruction();
-        }
+        self.pc += if x == y { 4 } else { 2 };
     }
 
     fn sne(&mut self, x: u8, y: u8) {
-        if x != y {
-            self.pc.afternext_instruction();
-        } else {
-            self.pc.next_instruction();
-        }
+        self.pc += if x != y { 4 } else { 2 };
     }
 
     fn ld(&mut self, register_number: usize, constant: u8) {
         self.v[register_number] = constant;
-        self.pc.next_instruction();
+        self.pc += 2;
     }
 
     fn add(&mut self, register_number: usize, constant: u8) {
         self.v[register_number] = self.v[register_number].wrapping_add(constant);
-        self.pc.next_instruction();
+        self.pc += 2;
     }
 
     fn opcode8(&mut self, subcode: u8, x: usize, y: usize) {
@@ -193,12 +183,12 @@ impl Chip8 {
             }
             _ => {}
         }
-        self.pc.next_instruction();
+        self.pc += 2;
     }
 
     fn ldi(&mut self, constant: u16) {
         self.i_reg = constant;
-        self.pc.next_instruction();
+        self.pc += 2;
     }
 
     fn display_sprite(&mut self, x: u8, y: u8, n: u8) {
@@ -241,22 +231,15 @@ impl Chip8 {
             }
         }
 
-        self.pc.next_instruction();
+        self.pc += 2;
     }
 
     fn opcodee(&mut self, x: usize, nn: u8) {
+        let reg = self.v[x] as usize;
         if nn == 0x9E {
-            if self.key_pressed[self.v[x] as usize] {
-                self.pc.afternext_instruction();
-            } else {
-                self.pc.next_instruction();
-            }
+            self.pc += if self.key_pressed[reg] { 4 } else { 2 };
         } else if nn == 0xA1 {
-            if !self.key_pressed[self.v[x] as usize] {
-                self.pc.afternext_instruction();
-            } else {
-                self.pc.next_instruction();
-            }
+            self.pc += if self.key_pressed[reg] { 2 } else { 4 };
         }
     }
 
@@ -265,12 +248,12 @@ impl Chip8 {
             0x0 => {
                 if n == 0x7 {
                     self.v[x] = self.delay_timer;
-                    self.pc.next_instruction();
+                    self.pc += 2;
                 } else if n == 0xA {
                     for i in 0..16 {
                         if self.key_pressed[i] {
                             self.v[x] = i as u8;
-                            self.pc.next_instruction();
+                            self.pc += 2;
                             break;
                         }
                     }
@@ -286,29 +269,29 @@ impl Chip8 {
                     self.i_reg = ireg;
                     self.v[15] = overflow_bit as u8;
                 }
-                self.pc.next_instruction();
+                self.pc += 2;
             }
             0x2 => {
                 self.i_reg = self.v[x] as u16 * 5;
-                self.pc.next_instruction();
+                self.pc += 2;
             }
             0x3 => {
                 self.memory[self.i_reg as usize] = self.v[x] / 100;
                 self.memory[self.i_reg as usize + 1] = (self.v[x] / 10) % 10;
                 self.memory[self.i_reg as usize + 2] = (self.v[x] % 100) % 10;
-                self.pc.next_instruction();
+                self.pc += 2;
             }
             0x5 => {
                 for i in 0..x {
                     self.memory[self.i_reg as usize + i] = self.v[i];
                 }
-                self.pc.next_instruction();
+                self.pc += 2;
             }
             0x6 => {
                 for i in 0..x {
                     self.v[i] = self.memory[self.i_reg as usize + i];
                 }
-                self.pc.next_instruction();
+                self.pc += 2;
             }
             _ => {}
         }
