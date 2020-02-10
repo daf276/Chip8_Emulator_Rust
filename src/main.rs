@@ -109,7 +109,7 @@ fn start_logic_thread(
         chip.emulate_cycle();
         *gfx.lock().unwrap() = chip.gfx.clone();
 
-        let time_to_wait = 50000u128.saturating_sub(before_cycle.elapsed().as_nanos()); //20k ips
+        let time_to_wait = 666_666_u128.saturating_sub(before_cycle.elapsed().as_nanos()); //60hz
         thread::sleep(Duration::new(0, time_to_wait as u32));
         //println!("{}", time_to_wait);
     });

@@ -187,7 +187,7 @@ mod tests {
         test_chip.emulate_cycle();
 
         assert_eq!(test_chip.v[1], 5);
-        assert_eq!(test_chip.v[15], 0);
+        assert_eq!(test_chip.v[15], 1);
 
         let mut test_chip2 = Chip8::new();
         test_chip2.memory[0x200] = 0x81;
@@ -197,7 +197,7 @@ mod tests {
         test_chip2.emulate_cycle();
 
         assert_eq!(test_chip2.v[1], 254);
-        assert_eq!(test_chip2.v[15], 1);
+        assert_eq!(test_chip2.v[15], 0);
     }
 
     #[test]
@@ -231,7 +231,7 @@ mod tests {
         test_chip.emulate_cycle();
 
         assert_eq!(test_chip.v[1], 5);
-        assert_eq!(test_chip.v[15], 0);
+        assert_eq!(test_chip.v[15], 1);
 
         let mut test_chip2 = Chip8::new();
         test_chip2.memory[0x200] = 0x81;
@@ -241,7 +241,7 @@ mod tests {
         test_chip2.emulate_cycle();
 
         assert_eq!(test_chip2.v[1], 254);
-        assert_eq!(test_chip2.v[15], 1);
+        assert_eq!(test_chip2.v[15], 0);
     }
 
     #[test]
@@ -333,7 +333,7 @@ mod tests {
         test_chip.memory[0x201] = 0x18;
         test_chip.v[5] = 12;
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.sound_timer, 12);
+        assert_eq!(test_chip.sound_timer, 11);
     }
 
     #[test]

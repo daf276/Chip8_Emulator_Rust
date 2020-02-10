@@ -24,21 +24,17 @@ impl Chip8 {
     pub const SCREEN_HEIGHT: u32 = 32;
 
     fn new() -> Chip8 {
-        let gfx = vec![vec![false; 64]; 32];
+        let gfx = vec![vec![false; Chip8::SCREEN_WIDTH as usize]; Chip8::SCREEN_HEIGHT as usize];
         let key_pressed = vec![false; 16];
         let mut memory = vec![0; 4096]; //4096 bits of memory
         let v = vec![0; 16]; //CPU registers named V0 to VE, last register is the carry flag
         let stack = vec![0; 16]; //16 Stacklevels
-
         let opcode = 0;
         let sp = 0;
         let pc = 0x200;
-
         let i_reg = 0;
-
         let delay_timer = 0;
         let sound_timer = 0;
-
         let screen_scale = 1;
 
         memory = Chip8::load_hex_digits(memory);
@@ -78,8 +74,9 @@ impl Chip8 {
     }
 
     pub fn emulate_cycle(&mut self) {
-        self.opcode =
-            (self.memory[self.pc as usize] as u16) << 8 | self.memory[self.pc as usize + 1] as u16;
+        let opcode_upper_8bit = (self.memory[self.pc as usize] as u16) << 8;
+        let opcode_lower_8bit = self.memory[self.pc as usize + 1] as u16;
+        self.opcode = opcode_upper_8bit | opcode_lower_8bit;
 
         let instruction = (&self.opcode & 0xF000) >> 12;
         let nnn = self.opcode & 0x0FFF;
@@ -108,9 +105,13 @@ impl Chip8 {
             _ => {}
         }
 
-        // TODO Fully implement timers
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
+        }
+
+        if self.sound_timer > 0 {
+            println!("Bzz"); //Todo actually make sound instead of console output
+            self.sound_timer -= 1;
         }
     }
 
@@ -166,7 +167,7 @@ impl Chip8 {
             0x5 => {
                 let (reg, overflow_bit) = self.v[x].overflowing_sub(self.v[y]);
                 self.v[x] = reg;
-                self.v[15] = overflow_bit as u8;
+                self.v[15] = !overflow_bit as u8;
             }
             0x6 => {
                 self.v[15] = self.v[x] & 0b1;
@@ -175,7 +176,7 @@ impl Chip8 {
             0x7 => {
                 let (reg, overflow_bit) = self.v[y].overflowing_sub(self.v[x]);
                 self.v[x] = reg;
-                self.v[15] = overflow_bit as u8;
+                self.v[15] = !overflow_bit as u8;
             }
             0xE => {
                 self.v[15] = (self.v[x] & 0b10000000) >> 7;
