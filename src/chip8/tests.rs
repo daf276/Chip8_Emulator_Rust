@@ -323,7 +323,7 @@ mod tests {
         test_chip.memory[0x201] = 0x15;
         test_chip.v[5] = 12;
         test_chip.emulate_cycle();
-        assert_eq!(test_chip.delay_timer, 12);
+        assert_eq!(test_chip.delay_timer, 11);
     }
 
     #[test]
