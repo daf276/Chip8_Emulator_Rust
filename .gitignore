@@ -18,3 +18,7 @@ Cargo.lock
 #**/*.rs.bk
 
 /*.dll
+
+/.idea
+*.ch8
+chip8_emulator_rust.iml

@@ -59,7 +59,7 @@ impl Chip8 {
         }
     }
 
-    pub fn create_chip(mut file: File, screen_scale: u32) -> Chip8 {
+    pub fn create_chip(file: File, screen_scale: u32) -> Chip8 {
         let mut chip = Chip8::load_program(file);
         chip.screen_scale = screen_scale;
         chip

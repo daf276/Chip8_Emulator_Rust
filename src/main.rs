@@ -19,9 +19,10 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const PITCH: usize = (Chip8::SCREEN_WIDTH * 4) as usize;
+
 fn main() {
     let matches = App::new("Chip-8 Emulator")
-        .version("0.3.0")
+        .version("0.4.0")
         .arg(
             Arg::with_name("file")
                 .short("f")
@@ -48,17 +49,15 @@ fn main() {
 
     match matches.value_of("file") {
         Some(f) => match File::open(f) {
-            Ok(file) => {
-                let mut chip = chip8::Chip8::create_chip(file, screen_scale);
-                emulate(chip);
-            }
+            Ok(file) => emulate(Chip8::create_chip(file, screen_scale)),
             Err(_) => println!("File doesnt exist"),
         },
         None => println!("No File passed"),
     }
 }
 
-fn emulate(mut chip: chip8::Chip8) {
+fn emulate(chip: Chip8) {
+    //Todo check if better solution for this exists
     let (mut event_pump, mut canvas) =
         init_sdl(Chip8::SCREEN_WIDTH, Chip8::SCREEN_HEIGHT, chip.screen_scale);
     let texture_creator = canvas.texture_creator();
@@ -68,34 +67,21 @@ fn emulate(mut chip: chip8::Chip8) {
             Chip8::SCREEN_WIDTH,
             Chip8::SCREEN_HEIGHT,
         )
-        .expect("Can't create texture");
+        .unwrap();
 
-    let mutex = Arc::new(Mutex::new(vec![vec![false; 64]; 32]));
-    let thread_mutex = mutex.clone();
+    let gfx = Arc::new(Mutex::new(vec![vec![false; 64]; 32]));
+    let keys = Arc::new(Mutex::new(vec![false; 16]));
 
-    thread::spawn(move || loop {
-        let before_cycle = Instant::now();
-        //chip.key_pressed = map_keys(&mut event_pump);
-        chip.emulate_cycle();
+    start_logic_thread(chip, keys.clone(), gfx.clone());
 
-        *thread_mutex.lock().unwrap() = chip.gfx.clone();
-
-        let time_to_wait = 50000u128.saturating_sub(before_cycle.elapsed().as_nanos());
-        thread::sleep(Duration::new(0, time_to_wait as u32));
-        println!("{}", time_to_wait);
-    });
-
-    let mut quit = false;
-
-    while !&quit {
+    while !quit_event_activated(&mut event_pump) {
+        //TODO try to make a render function out of this if texture lets me
         let before_cycle = Instant::now();
 
-        quit = quit_event_activated(&mut event_pump);
-        //chip.key_pressed = map_keys(&mut event_pump);
-        //chip.emulate_cycle();
+        *keys.lock().unwrap() = map_keys(&mut event_pump);
 
         let pixel_data = update_gfx(
-            &mutex.lock().unwrap().clone(),
+            &gfx.lock().unwrap().clone(),
             Chip8::SCREEN_WIDTH as usize,
             Chip8::SCREEN_HEIGHT as usize,
         );
@@ -109,6 +95,24 @@ fn emulate(mut chip: chip8::Chip8) {
                                                                                               //println!("{}", time_to_wait);
         thread::sleep(Duration::new(0, time_to_wait as u32));
     }
+}
+
+fn start_logic_thread(
+    mut chip: Chip8,
+    keys: Arc<Mutex<Vec<bool>>>,
+    gfx: Arc<Mutex<Vec<Vec<bool>>>>,
+) {
+    thread::spawn(move || loop {
+        let before_cycle = Instant::now();
+
+        chip.key_pressed = keys.lock().unwrap().clone();
+        chip.emulate_cycle();
+        *gfx.lock().unwrap() = chip.gfx.clone();
+
+        let time_to_wait = 50000u128.saturating_sub(before_cycle.elapsed().as_nanos()); //20k ips
+        thread::sleep(Duration::new(0, time_to_wait as u32));
+        //println!("{}", time_to_wait);
+    });
 }
 
 fn init_sdl(
@@ -138,15 +142,17 @@ fn init_sdl(
 }
 
 fn quit_event_activated(event_pump: &mut EventPump) -> bool {
-    for event in event_pump.poll_iter() {
-        if let Event::Quit { .. } = event {
-            return true;
+    event_pump.poll_iter().any(|x| {
+        if let Event::Quit { .. } = x {
+            true
+        } else {
+            false
         }
-    }
-    false
+    })
 }
 
 fn map_keys(event_pump: &mut EventPump) -> Vec<bool> {
+    //Todo find a better solution for this and put the keys in a config file
     let keys: HashSet<Keycode> = event_pump
         .keyboard_state()
         .pressed_scancodes()
@@ -155,7 +161,6 @@ fn map_keys(event_pump: &mut EventPump) -> Vec<bool> {
 
     let mut key_pressed = vec![false; 16];
 
-    //Todo find a better solution for this and put the keys in a config file
     for key in keys {
         match key {
             Keycode::Num1 => key_pressed[1] = true,
