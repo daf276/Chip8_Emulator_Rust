@@ -18,6 +18,7 @@ pub struct Chip8 {
 impl Chip8 {
     pub const SCREEN_WIDTH: usize = 64;
     pub const SCREEN_HEIGHT: usize = 32;
+    const GFX_BITMASK: [u8; 8] = [128, 64, 32, 16, 8, 4, 2, 1];
 
     fn new() -> Chip8 {
         let gfx = [[false; Chip8::SCREEN_WIDTH]; Chip8::SCREEN_HEIGHT];
@@ -70,6 +71,7 @@ impl Chip8 {
         let y = ((self.opcode & 0x00F0) >> 4) as usize;
         let x = ((self.opcode & 0x0F00) >> 8) as usize;
 
+        //TODO there's a bug: example: in pong only one player score gets increased
         match instruction {
             0x0 => self.opcode0(nn),
             0x1 => self.jump(nnn),
@@ -178,26 +180,22 @@ impl Chip8 {
     }
 
     fn display_sprite(&mut self, x: usize, y: usize, n: usize) {
-        self.v[15] = 0;
-        //TODO bug: only one sid gets wrapped around correctly?
-        //TODO this is unreadable, clean this shit up
-        let bitmask = [128u8, 64, 32, 16, 8, 4, 2, 1];
+        self.v[15] = 0; //Set VF to 0 if no pixel gets erased
         let bytes = self.memory[self.i_reg as usize..self.i_reg as usize + n].to_vec();
-        let mut x_pos = [0usize; 8];
-        let mut y_pos = vec![0usize; n];
 
         //Modulo with screen size because sprites get wrapped around the display
-        for i in 0..8 {
-            x_pos[i] = (self.v[x] as usize + i) % Chip8::SCREEN_WIDTH;
-        }
-        for i in 0..n {
-            y_pos[i] = (self.v[y] as usize + i) % Chip8::SCREEN_HEIGHT;
-        }
+        let x_pos: Vec<usize> = (0..8)
+            .map(|a| (self.v[x] as usize + a) % Chip8::SCREEN_WIDTH)
+            .collect();
+        let y_pos: Vec<usize> = (0..n)
+            .map(|a| (self.v[y] as usize + a) % Chip8::SCREEN_HEIGHT)
+            .collect();
 
         for (&y, &byte) in y_pos.iter().zip(bytes.iter()) {
-            for (&x, &bit) in x_pos.iter().zip(bitmask.iter()) {
+            for (&x, &bit) in x_pos.iter().zip(Chip8::GFX_BITMASK.iter()) {
                 let pixel_set = (byte & bit) != 0;
 
+                //If pixel gets erased, set VF to 1
                 if pixel_set && self.gfx[y][x] {
                     self.v[15] = 1;
                 }
