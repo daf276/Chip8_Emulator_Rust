@@ -10,3 +10,4 @@ edition = "2018"
 rand = "0.7"
 clap = "2"
 sdl2 = { version = "0.32.0", features = ["bundled", "static-link"] }
+iui = "0.3"

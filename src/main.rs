@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate iui;
 extern crate rand;
 extern crate sdl2;
 
@@ -6,6 +7,8 @@ mod chip8;
 
 use crate::chip8::Chip8;
 use clap::{App, Arg};
+use iui::controls::{Button, Group, Label, VerticalBox};
+use iui::prelude::*;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
@@ -18,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const PITCH: usize = (Chip8::SCREEN_WIDTH * 4) as usize;
+const PITCH: usize = Chip8::SCREEN_WIDTH * 4;
 
 fn main() {
     let matches = App::new("Chip-8 Emulator")
@@ -56,21 +59,79 @@ fn main() {
     }
 }
 
+fn menu() {
+    let ui = UI::init().unwrap();
+    let mut win =
+        iui::prelude::Window::new(&ui, "Chip-8 Emulator", 200, 200, WindowType::NoMenubar);
+
+    // Create a vertical layout to hold the controls
+    let mut vbox = VerticalBox::new(&ui);
+    vbox.set_padded(&ui, true);
+
+    let mut group_vbox = VerticalBox::new(&ui);
+    let mut group = Group::new(&ui, "Group");
+
+    // Create two buttons to place in the window
+    let mut button = Button::new(&ui, "Button");
+    button.on_clicked(&ui, {
+        let ui = ui.clone();
+        move |btn| {
+            btn.set_text(&ui, "Clicked!");
+        }
+    });
+
+    let mut quit_button = Button::new(&ui, "Quit");
+    quit_button.on_clicked(&ui, {
+        let ui = ui.clone();
+        move |_| {
+            ui.quit();
+        }
+    });
+
+    // Create a new label. Note that labels don't auto-wrap!
+    let mut label_text = String::new();
+    label_text.push_str("There is a ton of text in this label.\n");
+    label_text.push_str("Pretty much every unicode character is supported.\n");
+    label_text.push_str("🎉 用户界面 사용자 인터페이스");
+    let label = Label::new(&ui, &label_text);
+
+    vbox.append(&ui, label, LayoutStrategy::Stretchy);
+    group_vbox.append(&ui, button, LayoutStrategy::Compact);
+    group_vbox.append(&ui, quit_button, LayoutStrategy::Compact);
+    group.set_child(&ui, group_vbox);
+    vbox.append(&ui, group, LayoutStrategy::Compact);
+
+    // Actually put the button in the window
+    win.set_child(&ui, vbox);
+
+    win.show(&ui);
+    ui.main();
+
+    unsafe {
+        win.destroy();
+    }
+}
+
 fn emulate(chip: Chip8) {
     //Todo check if better solution for this exists
-    let (mut event_pump, mut canvas) =
-        init_sdl(Chip8::SCREEN_WIDTH, Chip8::SCREEN_HEIGHT, chip.screen_scale);
+    let (mut event_pump, mut canvas) = init_sdl(
+        Chip8::SCREEN_WIDTH as u32,
+        Chip8::SCREEN_HEIGHT as u32,
+        chip.screen_scale,
+    );
     let texture_creator = canvas.texture_creator();
     let mut texture = texture_creator
         .create_texture_static(
             PixelFormatEnum::ABGR8888,
-            Chip8::SCREEN_WIDTH,
-            Chip8::SCREEN_HEIGHT,
+            Chip8::SCREEN_WIDTH as u32,
+            Chip8::SCREEN_HEIGHT as u32,
         )
         .unwrap();
 
-    let gfx = Arc::new(Mutex::new(vec![vec![false; 64]; 32]));
-    let keys = Arc::new(Mutex::new(vec![false; 16]));
+    let gfx = Arc::new(Mutex::new(
+        [[false; Chip8::SCREEN_WIDTH]; Chip8::SCREEN_HEIGHT],
+    ));
+    let keys = Arc::new(Mutex::new([false; 16]));
 
     start_logic_thread(chip, keys.clone(), gfx.clone());
 
@@ -82,8 +143,8 @@ fn emulate(chip: Chip8) {
 
         let pixel_data = update_gfx(
             &gfx.lock().unwrap().clone(),
-            Chip8::SCREEN_WIDTH as usize,
-            Chip8::SCREEN_HEIGHT as usize,
+            Chip8::SCREEN_WIDTH,
+            Chip8::SCREEN_HEIGHT,
         );
 
         texture.update(None, &pixel_data[..], PITCH).unwrap();
@@ -92,15 +153,14 @@ fn emulate(chip: Chip8) {
         canvas.present();
 
         let time_to_wait = 16_666_666_u128.saturating_sub(before_cycle.elapsed().as_nanos()); //60Fps
-                                                                                              //println!("{}", time_to_wait);
         thread::sleep(Duration::new(0, time_to_wait as u32));
     }
 }
 
 fn start_logic_thread(
     mut chip: Chip8,
-    keys: Arc<Mutex<Vec<bool>>>,
-    gfx: Arc<Mutex<Vec<Vec<bool>>>>,
+    keys: Arc<Mutex<[bool; 16]>>,
+    gfx: Arc<Mutex<[[bool; Chip8::SCREEN_WIDTH]; Chip8::SCREEN_HEIGHT]>>,
 ) {
     thread::spawn(move || loop {
         let before_cycle = Instant::now();
@@ -109,9 +169,9 @@ fn start_logic_thread(
         chip.emulate_cycle();
         *gfx.lock().unwrap() = chip.gfx.clone();
 
-        let time_to_wait = 666_666_u128.saturating_sub(before_cycle.elapsed().as_nanos()); //60hz
+        let time_to_wait = 50000_u128.saturating_sub(before_cycle.elapsed().as_nanos());
         thread::sleep(Duration::new(0, time_to_wait as u32));
-        //println!("{}", time_to_wait);
+        println!("{}", time_to_wait);
     });
 }
 
@@ -151,7 +211,7 @@ fn quit_event_activated(event_pump: &mut EventPump) -> bool {
     })
 }
 
-fn map_keys(event_pump: &mut EventPump) -> Vec<bool> {
+fn map_keys(event_pump: &mut EventPump) -> [bool; 16] {
     //Todo find a better solution for this and put the keys in a config file
     let keys: HashSet<Keycode> = event_pump
         .keyboard_state()
@@ -159,7 +219,7 @@ fn map_keys(event_pump: &mut EventPump) -> Vec<bool> {
         .filter_map(Keycode::from_scancode)
         .collect();
 
-    let mut key_pressed = vec![false; 16];
+    let mut key_pressed = [false; 16];
 
     for key in keys {
         match key {
@@ -186,7 +246,11 @@ fn map_keys(event_pump: &mut EventPump) -> Vec<bool> {
     key_pressed
 }
 
-fn update_gfx(emulator_gfx: &[Vec<bool>], screen_width: usize, screen_height: usize) -> Vec<u8> {
+fn update_gfx(
+    emulator_gfx: &[[bool; Chip8::SCREEN_WIDTH]; Chip8::SCREEN_HEIGHT],
+    screen_width: usize,
+    screen_height: usize,
+) -> Vec<u8> {
     let mut gfx = vec![0; screen_width * screen_height];
 
     for i in 0..screen_height {

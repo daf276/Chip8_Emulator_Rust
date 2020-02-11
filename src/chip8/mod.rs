@@ -1,57 +1,42 @@
 use std::fs::File;
 use std::io::prelude::*;
 pub struct Chip8 {
-    pub gfx: Vec<Vec<bool>>,
-    pub key_pressed: Vec<bool>,
-    memory: Vec<u8>,
-    v: Vec<u8>,
-    stack: Vec<u16>,
-
+    pub screen_scale: u32,
+    pub gfx: [[bool; Chip8::SCREEN_WIDTH]; Chip8::SCREEN_HEIGHT],
+    pub key_pressed: [bool; 16],
+    memory: [u8; 4096],
+    v: [u8; 16],
+    stack: [u16; 16],
     opcode: u16,
     pc: u16,
     sp: u8,
-
     i_reg: u16,
-
     delay_timer: u8,
     sound_timer: u8,
-
-    pub screen_scale: u32,
 }
 
 impl Chip8 {
-    pub const SCREEN_WIDTH: u32 = 64;
-    pub const SCREEN_HEIGHT: u32 = 32;
+    pub const SCREEN_WIDTH: usize = 64;
+    pub const SCREEN_HEIGHT: usize = 32;
 
     fn new() -> Chip8 {
-        let gfx = vec![vec![false; Chip8::SCREEN_WIDTH as usize]; Chip8::SCREEN_HEIGHT as usize];
-        let key_pressed = vec![false; 16];
-        let mut memory = vec![0; 4096]; //4096 bits of memory
-        let v = vec![0; 16]; //CPU registers named V0 to VE, last register is the carry flag
-        let stack = vec![0; 16]; //16 Stacklevels
-        let opcode = 0;
-        let sp = 0;
-        let pc = 0x200; //Execution must start here
-        let i_reg = 0;
-        let delay_timer = 0;
-        let sound_timer = 0;
-        let screen_scale = 1;
-
+        let gfx = [[false; Chip8::SCREEN_WIDTH]; Chip8::SCREEN_HEIGHT];
+        let mut memory = [0; 4096]; //4096 bits of memory
         memory = Chip8::load_hex_digits(memory);
 
         Chip8 {
             gfx,
-            key_pressed,
+            key_pressed: [false; 16], //16 Keys
             memory,
-            v,
-            stack,
-            opcode,
-            i_reg,
-            pc,
-            sp,
-            delay_timer,
-            sound_timer,
-            screen_scale,
+            v: [0; 16],     //CPU registers named V0 to VE, last register is the carry flag
+            stack: [0; 16], //16 Stacklevels
+            opcode: 0,
+            i_reg: 0,
+            pc: 0x200, //Execution must start at 0x200
+            sp: 0,
+            delay_timer: 0,
+            sound_timer: 0,
+            screen_scale: 1,
         }
     }
 
@@ -99,10 +84,10 @@ impl Chip8 {
             0xA => self.ldi(nnn),
             0xB => self.jump(nnn + self.v[0] as u16),
             0xC => self.ld(x, rand::random::<u8>() & nn),
-            0xD => self.display_sprite(x as u8, y as u8, n),
+            0xD => self.display_sprite(x, y, n as usize),
             0xE => self.opcodee(x, nn),
             0xF => self.opcodef(x, y, n),
-            _ => {}
+            _ => unreachable!(),
         }
 
         if self.delay_timer > 0 {
@@ -117,7 +102,7 @@ impl Chip8 {
 
     fn opcode0(&mut self, subcode: u8) {
         if subcode == 0xE0 {
-            self.gfx = vec![vec![false; 64]; 32];
+            self.gfx = [[false; 64]; 32];
         } else if subcode == 0xEE {
             self.sp -= 1;
             self.pc = self.stack[self.sp as usize];
@@ -192,43 +177,32 @@ impl Chip8 {
         self.pc += 2;
     }
 
-    fn display_sprite(&mut self, x: u8, y: u8, n: u8) {
+    fn display_sprite(&mut self, x: usize, y: usize, n: usize) {
+        self.v[15] = 0;
+        //TODO bug: only one sid gets wrapped around correctly?
         //TODO this is unreadable, clean this shit up
         let bitmask = [128u8, 64, 32, 16, 8, 4, 2, 1];
-        let mut x_pos = vec![0; 8];
+        let bytes = self.memory[self.i_reg as usize..self.i_reg as usize + n].to_vec();
+        let mut x_pos = [0usize; 8];
+        let mut y_pos = vec![0usize; n];
 
-        let x = self.v[x as usize] as usize;
-        let mut y = self.v[y as usize] as isize;
-
-        //Init overflow register as 0
-        self.v[15] = 0;
-
-        //For horizontal display wrap around
+        //Modulo with screen size because sprites get wrapped around the display
         for i in 0..8 {
-            if x + i < 64 {
-                x_pos[i] = x + i;
-            } else {
-                x_pos[i] = x + i - 64;
-            }
+            x_pos[i] = (self.v[x] as usize + i) % Chip8::SCREEN_WIDTH;
+        }
+        for i in 0..n {
+            y_pos[i] = (self.v[y] as usize + i) % Chip8::SCREEN_HEIGHT;
         }
 
-        for i in 0..n as usize {
-            let byte = self.memory[self.i_reg as usize + i];
+        for (&y, &byte) in y_pos.iter().zip(bytes.iter()) {
+            for (&x, &bit) in x_pos.iter().zip(bitmask.iter()) {
+                let pixel_set = (byte & bit) != 0;
 
-            if y + i as isize >= 32 {
-                y = -(i as isize);
-            } //For vertical display wrap around
-
-            for j in 0..8 {
-                if self.v[15] != 1
-                    && (byte & bitmask[j]) > 0
-                    && self.gfx[(y as usize).wrapping_add(i)][x_pos[j] as usize]
-                {
+                if pixel_set && self.gfx[y][x] {
                     self.v[15] = 1;
                 }
-                self.gfx[(y as usize).wrapping_add(i)][x_pos[j] as usize] = ((byte & bitmask[j])
-                    > 0)
-                    ^ self.gfx[(y as usize).wrapping_add(i)][x_pos[j] as usize];
+
+                self.gfx[y][x] ^= pixel_set;
             }
         }
 
@@ -297,7 +271,7 @@ impl Chip8 {
         }
     }
 
-    fn load_hex_digits(mut memory: Vec<u8>) -> Vec<u8> {
+    fn load_hex_digits(mut memory: [u8; 4096]) -> [u8; 4096] {
         //Zero
         memory[0] = 0xF0;
         memory[1] = 0x90;
