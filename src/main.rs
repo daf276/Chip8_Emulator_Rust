@@ -25,7 +25,7 @@ const PITCH: usize = Chip8::SCREEN_WIDTH * 4;
 
 fn main() {
     let matches = App::new("Chip-8 Emulator")
-        .version("0.5.0")
+        .version("0.6.0")
         .arg(
             Arg::with_name("file")
                 .short("f")
@@ -171,7 +171,7 @@ fn start_logic_thread(
 
         let time_to_wait = 50000_u128.saturating_sub(before_cycle.elapsed().as_nanos());
         thread::sleep(Duration::new(0, time_to_wait as u32));
-        println!("{}", time_to_wait);
+        //println!("{}", time_to_wait);
     });
 }
 

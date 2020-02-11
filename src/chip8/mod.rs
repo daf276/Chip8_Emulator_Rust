@@ -71,7 +71,6 @@ impl Chip8 {
         let y = ((self.opcode & 0x00F0) >> 4) as usize;
         let x = ((self.opcode & 0x0F00) >> 8) as usize;
 
-        //TODO there's a bug: example: in pong only one player score gets increased
         match instruction {
             0x0 => self.opcode0(nn),
             0x1 => self.jump(nnn),
@@ -97,7 +96,7 @@ impl Chip8 {
         }
 
         if self.sound_timer > 0 {
-            println!("Bzz"); //Todo actually make sound instead of console output
+            //println!("Bzz"); //Todo actually make sound instead of console output
             self.sound_timer -= 1;
         }
     }
@@ -254,13 +253,13 @@ impl Chip8 {
                 self.pc += 2;
             }
             0x5 => {
-                for i in 0..x {
+                for i in 0..=x {
                     self.memory[self.i_reg as usize + i] = self.v[i];
                 }
                 self.pc += 2;
             }
             0x6 => {
-                for i in 0..x {
+                for i in 0..=x {
                     self.v[i] = self.memory[self.i_reg as usize + i];
                 }
                 self.pc += 2;

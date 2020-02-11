@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test_store_all_regs_to_memory() {
         let mut test_chip = Chip8::new();
-        test_chip.memory[0x200] = 0xF3;
+        test_chip.memory[0x200] = 0xF2;
         test_chip.memory[0x201] = 0x55;
 
         test_chip.i_reg = 0x500;
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn test_store_memory_to_all_regs() {
         let mut test_chip = Chip8::new();
-        test_chip.memory[0x200] = 0xF3;
+        test_chip.memory[0x200] = 0xF2;
         test_chip.memory[0x201] = 0x65;
 
         test_chip.i_reg = 0x400;
